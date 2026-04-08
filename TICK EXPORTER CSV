@@ -1,0 +1,84 @@
+using System;
+using System.IO;
+using cAlgo.API;
+using cAlgo.API.Internals;
+
+namespace cAlgo.Robots
+{
+    [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.FullAccess)]
+    public class BacktestDataExporter : Robot
+    {
+        [Parameter("Start Date (UTC)", DefaultValue = "2024-01-01")]
+        public DateTime StartDate { get; set; }
+
+        [Parameter("File Name", DefaultValue = "BacktestDataExport")]
+        public string FileName { get; set; }
+
+        private StreamWriter _writer;
+        private long _tickCount = 0;
+
+        protected override void OnStart()
+        {
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string fullPath = Path.Combine(desktopPath, FileName + ".csv");
+
+            try
+            {
+                _writer = new StreamWriter(fullPath, false);
+                
+                // Header matches DataModel.cs: [Name("High")] = Ask, [Name("Low")] = Bid
+                _writer.WriteLine("Date,High,Low,Volume");
+                Print($"Tick export started. Writing to: {fullPath}");
+            }
+            catch (Exception ex)
+            {
+                Print("Error initializing exporter: " + ex.Message);
+                Stop();
+            }
+        }
+
+        protected override void OnTick()
+        {
+            if (_writer == null) return;
+
+            DateTime tickTime = Server.Time;
+            if (tickTime < StartDate) return;
+
+            double ask = Symbol.Ask;
+            double bid = Symbol.Bid;
+            double volume = Symbol.Spread / Symbol.PipSize; // tick-level volume proxy
+
+            // Format: Date, High (=Ask), Low (=Bid), Volume
+            string line = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "{0:yyyy-MM-dd HH:mm:ss.fff},{1},{2},{3}",
+                tickTime,
+                ask,
+                bid,
+                Bars.TickVolumes.LastValue);
+
+            _writer.WriteLine(line);
+
+            _tickCount++;
+            
+            // Flush every 1000 ticks for performance (not every tick)
+            if (_tickCount % 1000 == 0)
+            {
+                _writer.Flush();
+                Print($"Exported {_tickCount:N0} ticks | Ask={ask:F5} Bid={bid:F5} Spread={(ask-bid)/Symbol.PipSize:F1}p");
+            }
+        }
+
+        protected override void OnStop()
+        {
+            if (_writer != null)
+            {
+                _writer.Flush();
+                _writer.Close();
+                _writer.Dispose();
+                _writer = null;
+            }
+            Print($"Export complete. Total ticks: {_tickCount:N0}");
+        }
+    }
+}
