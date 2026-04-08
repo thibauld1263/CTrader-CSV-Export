@@ -6,5 +6,16 @@ How to use:
 -2: select the start exporting date and add a file name
 -3: run a backtest
 
+OHLCV Export
+=====
+
+Tick Exporter
+-1: select your pair and timeframe
+-2: select the start exporting date and add a file name
+-3: run a backtest
+
+Bid / Ask Export
+
+
 The script will export them once finished.
 Support ticks, renko and all other charts.
